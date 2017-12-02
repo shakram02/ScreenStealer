@@ -1,5 +1,7 @@
 package com.server;
 
+import com.sun.istack.internal.NotNull;
+
 import java.awt.BorderLayout;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayInputStream;
@@ -19,7 +21,7 @@ public class ScreenSpyServer extends JFrame {
 
     public ScreenSpyServer() throws IOException, InterruptedException {
         super("Team-Viewer");
-        this.setSize(900, 900);
+        this.setSize(900, 768);
         this.setVisible(true);
         this.setDefaultCloseOperation(EXIT_ON_CLOSE);
         this.setLocationRelativeTo(null);
@@ -30,37 +32,23 @@ public class ScreenSpyServer extends JFrame {
         ServerSocket serverSocket = new ServerSocket(SERVER_PORT);
         Socket socket = serverSocket.accept();
         InputStream inputStream = socket.getInputStream();
-        BufferedImage image;
-        byte[] imageAr;
-        byte[] sizeAr;
 
         while (true) {
+            int size;
 
-
-            sizeAr = new byte[4];
-
-            if (inputStream.available() < 4) {
-                Thread.sleep(10);   // Wait a bit
-            }
-
-            if (inputStream.read(sizeAr, 0, 4) == -1) {
+            try {
+                size = readImageSize(inputStream);
+            } catch (IllegalStateException e) {
                 break;
             }
 
-            int size = ByteBuffer.wrap(sizeAr).order(ByteOrder.BIG_ENDIAN).asIntBuffer().get();
             System.out.println("Will receive: " + size + " bytes");
-
-            imageAr = new byte[size];
-            for (int i = 0; i < size; i++) {
-                imageAr[i] = (byte) inputStream.read();
-            }
-            image = ImageIO.read(new ByteArrayInputStream(imageAr));
+            BufferedImage image = readImage(size, inputStream);
 
             if (image == null) {
                 throw new IllegalStateException("Incomplete image received");
             }
 
-            System.out.println("Received " + image.getHeight() + "x" + image.getWidth());
             ImageIcon icon = new ImageIcon(image);
             l.setIcon(icon);
             this.revalidate();
@@ -69,6 +57,33 @@ public class ScreenSpyServer extends JFrame {
         serverSocket.close();
     }
 
+    private static int readImageSize(InputStream inputStream) throws IOException, InterruptedException {
+        byte[] sizeAr = new byte[4];
+
+        if (inputStream.available() < 4) {
+            Thread.sleep(10);   // Wait a bit
+        }
+        for (int i = 0; i < 4; i++) {
+            sizeAr[i] = (byte) inputStream.read();
+
+            if (sizeAr[i] == -1) {
+                throw new IllegalStateException("End of stream");
+            }
+        }
+
+        return ByteBuffer.wrap(sizeAr).order(ByteOrder.BIG_ENDIAN).asIntBuffer().get();
+    }
+
+    @NotNull
+    private static BufferedImage readImage(int imageSize, InputStream inputStream) throws IOException {
+        byte[] imageAr = new byte[imageSize];
+
+        for (int i = 0; i < imageSize; i++) {
+            imageAr[i] = (byte) inputStream.read();
+        }
+
+        return ImageIO.read(new ByteArrayInputStream(imageAr));
+    }
 
     public static void main(String[] args) throws IOException, InterruptedException {
         new ScreenSpyServer();

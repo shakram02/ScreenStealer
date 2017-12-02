@@ -4,6 +4,7 @@ import javax.imageio.ImageIO;
 import java.awt.*;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.io.OutputStream;
 import java.net.InetSocketAddress;
 import java.net.Socket;
@@ -14,7 +15,6 @@ public class ScreenSpyClient {
 
     private static String SERVER_IP = "127.0.0.1";
     private static int SERVER_PORT = 13267;
-
 
     public static void main(String[] args) throws Exception {
         OutputStream outputStream = null;
@@ -51,12 +51,12 @@ public class ScreenSpyClient {
                 Thread.sleep(100);
             }
 
+        } catch (IOException e) {
+            throw new RuntimeException(e);
         } finally {
             if (outputStream != null) outputStream.close();
             assert socket != null;
             socket.close();
         }
-
-
     }
 }
