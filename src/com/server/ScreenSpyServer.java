@@ -16,55 +16,66 @@ import javax.swing.ImageIcon;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
 
-public class ScreenSpyServer extends JFrame {
+public class ScreenSpyServer extends JFrame implements Runnable {
     private static int SERVER_PORT = 13267;
+    private static int INT_SIZE_IN_BYTES = 4;
+    private final JLabel jLabel;
 
-    public ScreenSpyServer() throws IOException, InterruptedException {
+    private ScreenSpyServer() throws IOException {
         super("Team-Viewer");
         this.setSize(900, 768);
         this.setVisible(true);
         this.setDefaultCloseOperation(EXIT_ON_CLOSE);
         this.setLocationRelativeTo(null);
 
-        JLabel l = new JLabel();
-        this.add(l, BorderLayout.CENTER);
+        this.jLabel = new JLabel();
+        this.add(jLabel, BorderLayout.CENTER);
 
-        ServerSocket serverSocket = new ServerSocket(SERVER_PORT);
-        Socket socket = serverSocket.accept();
-        InputStream inputStream = socket.getInputStream();
 
-        while (true) {
-            int size;
-
-            try {
-                size = readImageSize(inputStream);
-            } catch (IllegalStateException e) {
-                break;
-            }
-
-            System.out.println("Will receive: " + size + " bytes");
-            BufferedImage image = readImage(size, inputStream);
-
-            if (image == null) {
-                throw new IllegalStateException("Incomplete image received");
-            }
-
-            ImageIcon icon = new ImageIcon(image);
-            l.setIcon(icon);
-            this.revalidate();
-        }
-
-        serverSocket.close();
     }
 
-    private static int readImageSize(InputStream inputStream) throws IOException, InterruptedException {
+
+    @Override
+    public void run() {
+        ServerSocket serverSocket;
+        try {
+            serverSocket = new ServerSocket(SERVER_PORT);
+
+            Socket socket = serverSocket.accept();
+            InputStream inputStream = socket.getInputStream();
+
+            while (true) {
+                int size;
+
+                try {
+                    size = readImageSize(inputStream);
+                } catch (IllegalStateException e) {
+                    break;
+                }
+
+                System.out.println("Will receive: " + size + " bytes");
+                BufferedImage image = readImage(size, inputStream);
+
+                if (image == null) {
+                    throw new IllegalStateException("Incomplete image received");
+                }
+
+                ImageIcon icon = new ImageIcon(image);
+                jLabel.setIcon(icon);
+                this.revalidate();
+            }
+
+            serverSocket.close();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    private static int readImageSize(InputStream inputStream) throws IOException {
         byte[] sizeAr = new byte[4];
 
-        if (inputStream.available() < 4) {
-            Thread.sleep(10);   // Wait a bit
-        }
-        for (int i = 0; i < 4; i++) {
-            sizeAr[i] = (byte) inputStream.read();
+        for (int i = 0; i < INT_SIZE_IN_BYTES; i++) {
+            sizeAr[i] = (byte) inputStream.read();  // Will block if needed
 
             if (sizeAr[i] == -1) {
                 throw new IllegalStateException("End of stream");
@@ -85,7 +96,8 @@ public class ScreenSpyServer extends JFrame {
         return ImageIO.read(new ByteArrayInputStream(imageAr));
     }
 
-    public static void main(String[] args) throws IOException, InterruptedException {
-        new ScreenSpyServer();
+    public static void main(String[] args) throws IOException {
+        ScreenSpyServer server = new ScreenSpyServer();
+        server.run();
     }
 }
