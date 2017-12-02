@@ -1,54 +1,56 @@
 package com.client;
 
-import java.awt.BorderLayout;
-import java.awt.image.BufferedImage;
-import java.net.Socket;
 import javax.imageio.ImageIO;
-import javax.swing.ImageIcon;
-import javax.swing.JFrame;
-import javax.swing.JLabel;
+import java.awt.*;
+import java.awt.image.BufferedImage;
+import java.io.ByteArrayOutputStream;
+import java.io.OutputStream;
+import java.net.InetSocketAddress;
+import java.net.Socket;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 
-public class ScreenSpyClient extends JFrame {
+public class ScreenSpyClient {
+
     private static String SERVER_IP = "127.0.0.1";
     private static int SERVER_PORT = 13267;
 
-    public ScreenSpyClient() {
-        super("Team-Viewer");
-        this.setSize(900, 900);
-        this.setVisible(true);
-        this.setDefaultCloseOperation(EXIT_ON_CLOSE);
-        this.setLocationRelativeTo(null);
+    public static void main(String[] args) throws Exception {
+        OutputStream outputStream = null;
+        Socket socket = null;
+        ByteArrayOutputStream byteArrayOutputStream;
 
         try {
 
+            socket = new Socket();
+            socket.connect(new InetSocketAddress(SERVER_IP, SERVER_PORT));
 
-            JLabel l = new JLabel();
-            this.add(l, BorderLayout.CENTER);
-
+            // Sending
             while (true) {
-                try {
-                    Socket socket = new Socket(SERVER_IP, SERVER_PORT);
-                    BufferedImage image = ImageIO.read(socket.getInputStream());
-                    if (image != null) {
-                        System.out.println("image received!!!!");
-                        ImageIcon icon = new ImageIcon(image);
-                        l.setIcon(icon);
-                        //l=new JLabel(new ImageIcon(image));
-                        socket.close();
-                        this.revalidate();
-                    }
-                } catch (Exception e) {
-                    // TODO Auto-generated catch block
-                    System.err.println(e);
-                }
-            }
-        } catch (Exception e) {
-            // TODO Auto-generated catch block
-            System.err.println(e);
-        }
-    }
+                outputStream = socket.getOutputStream();
+                BufferedImage image = new Robot().createScreenCapture(new Rectangle(Toolkit.getDefaultToolkit().getScreenSize()));
 
-    public static void main(String[] args) {
-        new ScreenSpyClient();
+                byteArrayOutputStream = new ByteArrayOutputStream();
+                ImageIO.write(image, "jpg", byteArrayOutputStream);
+
+                int imageSizeBytes = byteArrayOutputStream.size();
+                byte[] size = ByteBuffer.allocate(4).order(ByteOrder.BIG_ENDIAN).putInt(byteArrayOutputStream.size()).array();
+                outputStream.write(size);
+                outputStream.write(byteArrayOutputStream.toByteArray(), 0, byteArrayOutputStream.size());
+                outputStream.flush();
+                byteArrayOutputStream.close();
+
+                System.out.println("Flushed: " + imageSizeBytes + " bytes");
+
+                Thread.sleep(1200);
+            }
+
+        } finally {
+            socket.close();
+            if (outputStream != null) outputStream.close();
+            if (socket != null) socket.close();
+        }
+
+
     }
 }

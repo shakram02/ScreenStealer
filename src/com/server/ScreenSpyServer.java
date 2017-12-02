@@ -1,57 +1,76 @@
 package com.server;
 
-import javax.imageio.ImageIO;
-import java.awt.*;
+import java.awt.BorderLayout;
 import java.awt.image.BufferedImage;
-import java.io.ByteArrayOutputStream;
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
 import java.io.InputStream;
-import java.io.OutputStream;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
+import javax.imageio.ImageIO;
+import javax.swing.ImageIcon;
+import javax.swing.JFrame;
+import javax.swing.JLabel;
 
-public class ScreenSpyServer {
+public class ScreenSpyServer extends JFrame {
+    private static int SERVER_PORT = 13267;
 
-    private final static int SOCKET_PORT = 13267;
+    public ScreenSpyServer() throws IOException, InterruptedException {
+        super("Team-Viewer");
+        this.setSize(900, 900);
+        this.setVisible(true);
+        this.setDefaultCloseOperation(EXIT_ON_CLOSE);
+        this.setLocationRelativeTo(null);
+
+        JLabel l = new JLabel();
+        this.add(l, BorderLayout.CENTER);
+
+        ServerSocket serverSocket = new ServerSocket(SERVER_PORT);
+        Socket socket = serverSocket.accept();
+        InputStream inputStream = socket.getInputStream();
+        BufferedImage image = null;
+        byte[] imageAr = null;
+        byte[] sizeAr = null;
+
+        while (true) {
 
 
-    public static void main(String[] args) throws Exception {
-        OutputStream outputStream = null;
-        ServerSocket serverSocket = null;
-        Socket sock = null;
-        InputStream inputStream = null;
+            sizeAr = new byte[4];
 
-        try {
-            serverSocket = new ServerSocket(SOCKET_PORT);
-            while (true) {
-                System.out.println("Waiting...");
-                try {
-                    sock = serverSocket.accept();
-                    System.out.println("Accepted connection, sending realtime view to this peer: " + sock);
-
-                    BufferedImage image = new Robot().createScreenCapture(new Rectangle(Toolkit.getDefaultToolkit().getScreenSize()));
-
-                    ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
-                    ImageIO.write(image, "jpg", byteArrayOutputStream);
-
-                    byte[] bytes = byteArrayOutputStream.toByteArray();
-                    outputStream = sock.getOutputStream();
-
-                    //System.out.println("Sending " + FILE_TO_SEND + "(" + mybytearray.length + " bytes)");
-                    System.out.println("sending image with len: " + bytes.length);
-
-                    outputStream.write(bytes, 0, bytes.length);
-                    outputStream.flush();
-                    //TimeUnit.SECONDS.sleep(1);
-
-                    //System.out.println("Done.");
-                } finally {
-                    if (inputStream != null) inputStream.close();
-                    if (outputStream != null) outputStream.close();
-                    if (sock != null) sock.close();
-                }
+            if (inputStream.available() < 4) {
+                Thread.sleep(10);   // Wait a bit
             }
-        } finally {
-            if (serverSocket != null) serverSocket.close();
+
+            if (inputStream.read(sizeAr, 0, 4) == -1) {
+                break;
+            }
+
+            int size = ByteBuffer.wrap(sizeAr).order(ByteOrder.BIG_ENDIAN).asIntBuffer().get();
+            System.out.println("Will receive: " + size + " bytes");
+
+            imageAr = new byte[size];
+            for (int i = 0; i < size; i++) {
+                imageAr[i] = (byte) inputStream.read();
+            }
+            image = ImageIO.read(new ByteArrayInputStream(imageAr));
+
+            if (image == null) {
+                throw new IllegalStateException("Incomplete image received");
+            }
+//
+            System.out.println("Received " + image.getHeight() + "x" + image.getWidth());
+            ImageIcon icon = new ImageIcon(image);
+            l.setIcon(icon);
+            this.revalidate();
         }
+
+        serverSocket.close();
+    }
+
+
+    public static void main(String[] args) throws IOException, InterruptedException {
+        new ScreenSpyServer();
     }
 }
