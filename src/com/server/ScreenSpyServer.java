@@ -44,14 +44,8 @@ public class ScreenSpyServer extends JFrame implements Runnable {
             Socket socket = serverSocket.accept();
             InputStream inputStream = socket.getInputStream();
 
-            while (true) {
-                int size;
-
-                try {
-                    size = readImageSize(inputStream);
-                } catch (IllegalStateException e) {
-                    break;
-                }
+            while (!Thread.interrupted()) {
+                int size = readImageSize(inputStream);
 
                 System.out.println("Will receive: " + size + " bytes");
                 BufferedImage image = readImage(size, inputStream);
