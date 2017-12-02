@@ -15,10 +15,13 @@ public class ScreenSpyClient {
     private static String SERVER_IP = "127.0.0.1";
     private static int SERVER_PORT = 13267;
 
+
     public static void main(String[] args) throws Exception {
         OutputStream outputStream = null;
         Socket socket = null;
         ByteArrayOutputStream byteArrayOutputStream;
+        Robot bot = new Robot();
+        Rectangle screenRectangle = new Rectangle(Toolkit.getDefaultToolkit().getScreenSize());
 
         try {
 
@@ -28,13 +31,16 @@ public class ScreenSpyClient {
             // Sending
             while (true) {
                 outputStream = socket.getOutputStream();
-                BufferedImage image = new Robot().createScreenCapture(new Rectangle(Toolkit.getDefaultToolkit().getScreenSize()));
+                BufferedImage image = bot.createScreenCapture(screenRectangle);
 
                 byteArrayOutputStream = new ByteArrayOutputStream();
                 ImageIO.write(image, "jpg", byteArrayOutputStream);
 
                 int imageSizeBytes = byteArrayOutputStream.size();
-                byte[] size = ByteBuffer.allocate(4).order(ByteOrder.BIG_ENDIAN).putInt(byteArrayOutputStream.size()).array();
+                byte[] size = ByteBuffer.allocate(4).order(ByteOrder.BIG_ENDIAN)
+                        .putInt(byteArrayOutputStream.size())
+                        .array();
+
                 outputStream.write(size);
                 outputStream.write(byteArrayOutputStream.toByteArray(), 0, byteArrayOutputStream.size());
                 outputStream.flush();
@@ -42,13 +48,13 @@ public class ScreenSpyClient {
 
                 System.out.println("Flushed: " + imageSizeBytes + " bytes");
 
-                Thread.sleep(1200);
+                Thread.sleep(100);
             }
 
         } finally {
-            socket.close();
             if (outputStream != null) outputStream.close();
-            if (socket != null) socket.close();
+            assert socket != null;
+            socket.close();
         }
 
 

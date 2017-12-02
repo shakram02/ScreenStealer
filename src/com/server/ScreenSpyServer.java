@@ -30,9 +30,9 @@ public class ScreenSpyServer extends JFrame {
         ServerSocket serverSocket = new ServerSocket(SERVER_PORT);
         Socket socket = serverSocket.accept();
         InputStream inputStream = socket.getInputStream();
-        BufferedImage image = null;
-        byte[] imageAr = null;
-        byte[] sizeAr = null;
+        BufferedImage image;
+        byte[] imageAr;
+        byte[] sizeAr;
 
         while (true) {
 
@@ -59,7 +59,7 @@ public class ScreenSpyServer extends JFrame {
             if (image == null) {
                 throw new IllegalStateException("Incomplete image received");
             }
-//
+
             System.out.println("Received " + image.getHeight() + "x" + image.getWidth());
             ImageIcon icon = new ImageIcon(image);
             l.setIcon(icon);
