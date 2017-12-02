@@ -21,7 +21,7 @@ public class ScreenSpyServer extends JFrame implements Runnable {
     private static int INT_SIZE_IN_BYTES = 4;
     private final JLabel jLabel;
 
-    private ScreenSpyServer() throws IOException {
+    private ScreenSpyServer() {
         super("Team-Viewer");
         this.setSize(900, 768);
         this.setVisible(true);
@@ -30,8 +30,6 @@ public class ScreenSpyServer extends JFrame implements Runnable {
 
         this.jLabel = new JLabel();
         this.add(jLabel, BorderLayout.CENTER);
-
-
     }
 
 
@@ -46,6 +44,11 @@ public class ScreenSpyServer extends JFrame implements Runnable {
 
             while (!Thread.interrupted()) {
                 int size = readImageSize(inputStream);
+
+                if (size == -1) {
+                    System.err.println("Socket closed");
+                    return;
+                }
 
                 System.out.println("Will receive: " + size + " bytes");
                 BufferedImage image = readImage(size, inputStream);
@@ -65,6 +68,13 @@ public class ScreenSpyServer extends JFrame implements Runnable {
         }
     }
 
+    /**
+     * Reads the size of the image from socket
+     *
+     * @param inputStream Socket input stream to read data from
+     * @return Size of the image or -1 if the socket was closed
+     * @throws IOException Socket stream read error
+     */
     private static int readImageSize(InputStream inputStream) throws IOException {
         byte[] sizeAr = new byte[4];
 
@@ -72,7 +82,7 @@ public class ScreenSpyServer extends JFrame implements Runnable {
             sizeAr[i] = (byte) inputStream.read();  // Will block if needed
 
             if (sizeAr[i] == -1) {
-                throw new IllegalStateException("End of stream");
+                return -1;
             }
         }
 
@@ -90,8 +100,11 @@ public class ScreenSpyServer extends JFrame implements Runnable {
         return ImageIO.read(new ByteArrayInputStream(imageAr));
     }
 
-    public static void main(String[] args) throws IOException {
+    public static void main(String[] args) throws InterruptedException {
         ScreenSpyServer server = new ScreenSpyServer();
-        server.run();
+
+        Thread th = new Thread(server);
+        th.run();
+        th.join();
     }
 }

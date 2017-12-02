@@ -52,17 +52,17 @@ public class ScreenSpyClient implements Runnable {
     }
 
     private void sendScreenShot(OutputStream socketOutputStream) throws IOException {
-        ByteArrayOutputStream byteArrayOutputStream = captureImageToStream();
+        ByteArrayOutputStream imageByteStream = captureImageToStream();
 
-        int imageSizeBytes = byteArrayOutputStream.size();
+        int imageSizeBytes = imageByteStream.size();
         byte[] size = ByteBuffer.allocate(4).order(ByteOrder.BIG_ENDIAN)
-                .putInt(byteArrayOutputStream.size())
+                .putInt(imageByteStream.size())
                 .array();
 
         socketOutputStream.write(size);
-        socketOutputStream.write(byteArrayOutputStream.toByteArray(), 0, byteArrayOutputStream.size());
+        socketOutputStream.write(imageByteStream.toByteArray(), 0, imageByteStream.size());
         socketOutputStream.flush();
-        byteArrayOutputStream.close();
+        imageByteStream.close();
 
         System.out.println("Flushed: " + imageSizeBytes + " bytes");
     }
