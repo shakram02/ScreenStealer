@@ -4,13 +4,13 @@ import com.sun.istack.internal.NotNull;
 
 import java.awt.BorderLayout;
 import java.awt.image.BufferedImage;
-import java.io.ByteArrayInputStream;
-import java.io.IOException;
-import java.io.InputStream;
+import java.io.*;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
+import java.util.Scanner;
+import java.util.concurrent.LinkedBlockingQueue;
 import javax.imageio.ImageIO;
 import javax.swing.ImageIcon;
 import javax.swing.JFrame;
@@ -20,6 +20,8 @@ public class ScreenSpyServer extends JFrame implements Runnable {
     private static int SERVER_PORT = 13267;
     private static int INT_SIZE_IN_BYTES = 4;
     private final JLabel jLabel;
+    LinkedBlockingQueue<Integer> userInput;
+    Thread inputReader;
 
     private ScreenSpyServer() {
         super("Team-Viewer");
@@ -30,8 +32,39 @@ public class ScreenSpyServer extends JFrame implements Runnable {
 
         this.jLabel = new JLabel();
         this.add(jLabel, BorderLayout.CENTER);
+        userInput = new LinkedBlockingQueue<>(2);
+
+        inputReader = new Thread(() -> {
+            Scanner s = new Scanner(System.in);
+            while (!Thread.interrupted()) {
+                runInputReader(s);
+            }
+        });
+
+        inputReader.start();
     }
 
+
+    private void runInputReader(Scanner s) {
+        System.out.println("Enter coordinates separated by a space i.e [250 333] ");
+        String input = s.nextLine().trim();
+
+        if (input.length() == 0) {
+            inputReader.interrupt();
+            return;
+        }
+
+        String[] coordinates = input.split(" ");
+
+
+        for (String coordinate : coordinates) {
+            try {
+                userInput.put(Integer.parseInt(coordinate));
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+        }
+    }
 
     @Override
     public void run() {
@@ -41,8 +74,18 @@ public class ScreenSpyServer extends JFrame implements Runnable {
 
             Socket socket = serverSocket.accept();
             InputStream inputStream = socket.getInputStream();
+            OutputStream outputStream = socket.getOutputStream();
 
             while (!Thread.interrupted()) {
+
+                if (userInput.size() > 0 && userInput.size() % 2 == 0) {
+                    int xCoordinate = userInput.poll();
+                    int yCoordinate = userInput.poll();
+
+                    outputStream.write(wrapInt(xCoordinate), 0, INT_SIZE_IN_BYTES);
+                    outputStream.write(wrapInt(yCoordinate), 0, INT_SIZE_IN_BYTES);
+                }
+
                 int size = readImageSize(inputStream);
 
                 if (size == -1) {
@@ -98,6 +141,12 @@ public class ScreenSpyServer extends JFrame implements Runnable {
         }
 
         return ImageIO.read(new ByteArrayInputStream(imageAr));
+    }
+
+    private static byte[] wrapInt(int number) {
+        return ByteBuffer.allocate(4).order(ByteOrder.BIG_ENDIAN)
+                .putInt(number)
+                .array();
     }
 
     public static void main(String[] args) throws InterruptedException {
