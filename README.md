@@ -17,3 +17,7 @@ The server  can control the mouse location of the victim device.
 This application can be easily extended to a remote desktop application. 
 
 That requires implementing mouse clicks which is very easy, hand handling hover events over the GUI window to sync the mouse motion in the 2 Devices
+
+Here's a screenshot
+
+![alta text](assets/server_screenshot.jpg)
