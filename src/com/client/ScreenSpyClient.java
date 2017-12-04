@@ -17,7 +17,7 @@ public class ScreenSpyClient implements Runnable {
     private static String SERVER_IP = "127.0.0.1";
     private static int SERVER_PORT = 13267;
     private static int INT_SIZE_IN_BYTES = 4;
-    private static int SLEEP_MS = 100;
+    private static int SLEEP_MS = 200;
     private Robot bot;
     private Rectangle screenRectangle;
 
@@ -29,23 +29,24 @@ public class ScreenSpyClient implements Runnable {
 
     @Override
     public void run() {
-        OutputStream outputStream = null;
-        InputStream inputStream = null;
+        OutputStream outputStream;
+        InputStream inputStream;
         Socket socket = new Socket();
 
         try {
             socket.connect(new InetSocketAddress(SERVER_IP, SERVER_PORT));
             outputStream = socket.getOutputStream();
             inputStream = socket.getInputStream();
+            System.out.println("Client started and connected successfully...");
             // Sending
-            while (!Thread.interrupted()) {
+            while (!Thread.interrupted() && !socket.isClosed()) {
 
                 if (inputStream.available() >= 2 * INT_SIZE_IN_BYTES) {
                     int xCoordinate = readInt(inputStream);
                     int yCoordinate = readInt(inputStream);
                     bot.mouseMove(xCoordinate, yCoordinate);
 
-                    System.out.println("Move mouse to: " +
+                    System.out.println("Moving mouse to: " +
                             xCoordinate + ", " + yCoordinate);
                 }
 
@@ -54,16 +55,15 @@ public class ScreenSpyClient implements Runnable {
             }
 
         } catch (IOException e) {
-            throw new RuntimeException(e);
+            System.err.println("An IO Error occurred:" + e.getLocalizedMessage());
         } catch (InterruptedException e) {
-            e.printStackTrace();
+            System.err.println("Terminated");
         } finally {
             try {
                 socket.close();
-                assert outputStream != null;
-                outputStream.close();
             } catch (IOException e) {
-                e.printStackTrace();
+                System.err.println("An IO Error occurred when closing the socket:"
+                        + e.getLocalizedMessage());
             }
         }
     }
@@ -71,7 +71,6 @@ public class ScreenSpyClient implements Runnable {
     private void sendScreenShot(OutputStream socketOutputStream) throws IOException {
         ByteArrayOutputStream imageByteStream = captureImageToStream();
 
-        int imageSizeBytes = imageByteStream.size();
         byte[] size = ByteBuffer.allocate(4).order(ByteOrder.BIG_ENDIAN)
                 .putInt(imageByteStream.size())
                 .array();
@@ -80,8 +79,6 @@ public class ScreenSpyClient implements Runnable {
         socketOutputStream.write(imageByteStream.toByteArray(), 0, imageByteStream.size());
         socketOutputStream.flush();
         imageByteStream.close();
-
-        System.out.println("Sent: " + imageSizeBytes + " bytes");
     }
 
     private ByteArrayOutputStream captureImageToStream() throws IOException {
