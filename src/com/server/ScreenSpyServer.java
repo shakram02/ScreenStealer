@@ -19,23 +19,24 @@ import javax.swing.JLabel;
 public class ScreenSpyServer extends JFrame implements Runnable {
     private static int SERVER_PORT = 13267;
     private static int INT_SIZE_IN_BYTES = 4;
-    private final JLabel jLabel;
-    LinkedBlockingQueue<Integer> userInput;
-    Thread inputReader;
+    private static String WINDOW_TITLE = "Screen-Spy";
+    private static final int WINDOW_WIDTH = 900;
+    private static final int WINDOW_HEIGHT = 768;
+    private JLabel jLabel;
+    private LinkedBlockingQueue<Integer> userInput;
+    private Thread inputReader;
 
     private ScreenSpyServer() {
-        super("Team-Viewer");
-        this.setSize(900, 768);
-        this.setVisible(true);
-        this.setDefaultCloseOperation(EXIT_ON_CLOSE);
-        this.setLocationRelativeTo(null);
+        super(WINDOW_TITLE);
+        createGui();
 
-        this.jLabel = new JLabel();
-        this.add(jLabel, BorderLayout.CENTER);
         userInput = new LinkedBlockingQueue<>(2);
 
+        // Run the input reader on another thread than the main thread,
+        // so the user input won't block the server
         inputReader = new Thread(() -> {
             Scanner s = new Scanner(System.in);
+
             while (!Thread.interrupted()) {
                 runInputReader(s);
             }
@@ -46,7 +47,9 @@ public class ScreenSpyServer extends JFrame implements Runnable {
 
 
     private void runInputReader(Scanner s) {
-        System.out.println("Enter coordinates separated by a space i.e [250 333] ");
+        System.out.println("Enter coordinates separated by a space i.e 250 333");
+        System.out.print("or enter an empty string to exit: ");
+        
         String input = s.nextLine().trim();
 
         if (input.length() == 0) {
@@ -55,7 +58,6 @@ public class ScreenSpyServer extends JFrame implements Runnable {
         }
 
         String[] coordinates = input.split(" ");
-
 
         for (String coordinate : coordinates) {
             try {
@@ -76,26 +78,14 @@ public class ScreenSpyServer extends JFrame implements Runnable {
             InputStream inputStream = socket.getInputStream();
             OutputStream outputStream = socket.getOutputStream();
 
-            while (!Thread.interrupted()) {
+            // Read mouse commands, Receive screenshots
+            while (!Thread.interrupted() && !socket.isClosed()) {
 
-                if (userInput.size() > 0 && userInput.size() % 2 == 0) {
-                    int xCoordinate = userInput.poll();
-                    int yCoordinate = userInput.poll();
-
-                    outputStream.write(wrapInt(xCoordinate), 0, INT_SIZE_IN_BYTES);
-                    outputStream.write(wrapInt(yCoordinate), 0, INT_SIZE_IN_BYTES);
-                }
+                sendMouseCommandsIfAny(outputStream);
 
                 int size = readImageSize(inputStream);
 
-                if (size == -1) {
-                    System.err.println("Socket closed");
-                    return;
-                }
-
-                System.out.println("Will receive: " + size + " bytes");
                 BufferedImage image = readImage(size, inputStream);
-
                 if (image == null) {
                     throw new IllegalStateException("Incomplete image received");
                 }
@@ -107,7 +97,7 @@ public class ScreenSpyServer extends JFrame implements Runnable {
 
             serverSocket.close();
         } catch (IOException e) {
-            e.printStackTrace();
+            System.err.println("An IO exception occurred:" + e.getLocalizedMessage());
         }
     }
 
@@ -123,10 +113,6 @@ public class ScreenSpyServer extends JFrame implements Runnable {
 
         for (int i = 0; i < INT_SIZE_IN_BYTES; i++) {
             sizeAr[i] = (byte) inputStream.read();  // Will block if needed
-
-            if (sizeAr[i] == -1) {
-                return -1;
-            }
         }
 
         return ByteBuffer.wrap(sizeAr).order(ByteOrder.BIG_ENDIAN).asIntBuffer().get();
@@ -143,10 +129,30 @@ public class ScreenSpyServer extends JFrame implements Runnable {
         return ImageIO.read(new ByteArrayInputStream(imageAr));
     }
 
+    private void sendMouseCommandsIfAny(OutputStream outputStream) throws IOException {
+        if (userInput.size() > 0 && userInput.size() % 2 == 0) {
+            int xCoordinate = userInput.poll();
+            int yCoordinate = userInput.poll();
+
+            outputStream.write(wrapInt(xCoordinate), 0, INT_SIZE_IN_BYTES);
+            outputStream.write(wrapInt(yCoordinate), 0, INT_SIZE_IN_BYTES);
+        }
+    }
+
     private static byte[] wrapInt(int number) {
         return ByteBuffer.allocate(4).order(ByteOrder.BIG_ENDIAN)
                 .putInt(number)
                 .array();
+    }
+
+    private void createGui() {
+        this.setSize(WINDOW_WIDTH, WINDOW_HEIGHT);
+        this.setVisible(true);
+        this.setDefaultCloseOperation(EXIT_ON_CLOSE);
+        this.setLocationRelativeTo(null);
+
+        this.jLabel = new JLabel();
+        this.add(jLabel, BorderLayout.CENTER);
     }
 
     public static void main(String[] args) throws InterruptedException {
